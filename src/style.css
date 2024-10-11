@@ -5,7 +5,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #282828;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,6 +13,12 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+canvas {
+  background-color: white;
+  outline: black solid 2px;
+  border-radius: 5px;
+  filter: drop-shadow(7px 7px 2px rgba(0, 0, 0, 1));
+}
 a {
   font-weight: 500;
   color: #646cff;
