@@ -5,8 +5,7 @@ const APP_NAME : string = "Draw Thing Please!";
 const CANVAS_WIDTH : number = 256
 const CANVAS_HEIGHT : number = 256
 const drawing_changed : Event = new CustomEvent("drawing-changed");
-//-------end const's
-
+//-------end const's---------------------------------
 //HTML SETUP------------------------------------
 const page: HTMLDivElement  = document.querySelector<HTMLDivElement>("#app")!;
 document.title = APP_NAME;
@@ -55,6 +54,9 @@ function clear_canvas(ctx : CanvasRenderingContext2D) {
 }
 
 canvas.addEventListener("mousedown", (e) => {
+    if (cursor.active) { //temporary fix for issues arising when the cursor leaves the canvas
+        buffer_size++;
+    }
     cursor.active = true;
     draw_buffer[buffer_size] = [];
     cursor.x = e.offsetX;
