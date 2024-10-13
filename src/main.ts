@@ -13,6 +13,11 @@ enum DRAW_MODES {
     MARKER,
     STICKER
 }
+const stickers: Sticker_Config[] = [
+    {name: "😎"},
+    {name: "🫥"},
+    {name: "👽"}
+];
 //-------end const's---------------------------------
 //HTML SETUP------------------------------------
 const page: HTMLDivElement  = document.querySelector<HTMLDivElement>("#app")!;
@@ -32,9 +37,8 @@ const button_div : HTMLDivElement = make_html_element("div", page);
             const marker_thick_button : HTMLButtonElement = make_html_element("button", marker_detail_div, "Thick");
             const marker_thin_button : HTMLButtonElement = make_html_element("button", marker_detail_div, "Thin");
         const sticker_detail_div : HTMLDivElement = make_html_element("div", action_detail_div);
-            const sticker_button1 : HTMLButtonElement = make_sticker_button("button", sticker_detail_div, "😎");
-            make_sticker_button("button", sticker_detail_div, "🫥");
-            make_sticker_button("button", sticker_detail_div, "👽");
+            draw_sticker_buttons(stickers);
+            const add_sticker_button : HTMLButtonElement = make_html_element("button", sticker_detail_div, "Add Sticker...");
     const command_button_div : HTMLDivElement = make_html_element("div", button_div);
         const undo_button: HTMLButtonElement = make_html_element("button", command_button_div, "Undo");
         const redo_button: HTMLButtonElement = make_html_element("button", command_button_div, "Redo");
@@ -44,12 +48,12 @@ marker_button.classList.add("selected");
 marker_thin_button.classList.add("selected");
 
 sticker_detail_div.hidden = true;
-sticker_button1.classList.add("selected");
+add_sticker_button.classList.add("last");
 //-------------
-
 //END HTML-------------------------------------------
 
 //Set up drawing---------------------------------
+type Sticker_Config = {name : string};
 type Drawable_Command = {
     display : (ctx : CanvasRenderingContext2D) => void;
     drag : (x:number, y:number) => void;
@@ -133,7 +137,7 @@ let undo_buffer_size : number = 0;
 
 let cur_mode : DRAW_MODES = DRAW_MODES.MARKER;
 let cur_thickness : number = 1;
-let cur_sticker_text : string = "😎";
+let cur_sticker_text : string|null = null;
 
 
 const cursor : Cursor = { active: false, x: 0, y: 0 };
@@ -177,15 +181,23 @@ function make_html_element(type : string, parent : Element, name : string = ""):
     element.innerHTML = name;
     return element;
 }
-function make_sticker_button(type : string, parent : Element, name : string = "") : HTMLButtonElement {
-    let button : HTMLButtonElement = make_html_element(type, parent, name);
+function make_sticker_button(parent : Element, name : string = "") : HTMLButtonElement {
+    let button : HTMLButtonElement = make_html_element("button", parent, name);
     button.addEventListener("click", () => {
         cur_sticker_text = name;
-        button.parentElement.querySelector(".selected").classList.remove("selected");
+        try {
+            button.parentElement.querySelector(".selected").classList.remove("selected");
+        } catch { //Look at what you make me do for my funny QoL )_)
+        }
         button.classList.add("selected");
         canvas.dispatchEvent(cursor_change);
     });
     return button;
+}
+function draw_sticker_buttons(button_list : Sticker_Config[]) {
+    for (let i = 0; i < button_list.length; i++) {
+        make_sticker_button(sticker_detail_div, button_list[i].name);
+    }
 }
 
 canvas.addEventListener("mouseout", () => {
@@ -248,6 +260,8 @@ sticker_button.addEventListener("click", () => {
     cur_mode = DRAW_MODES.STICKER;
     marker_detail_div.hidden = true;
     sticker_detail_div.hidden = false;
+    let first_button : HTMLButtonElement = sticker_detail_div.firstChild as HTMLButtonElement;
+    first_button.click();
 });
 marker_thin_button.addEventListener("click", () => {
     marker_thin_button.parentElement.querySelector(".selected").classList.remove("selected");
@@ -259,6 +273,17 @@ marker_thick_button.addEventListener("click", () => {
     marker_thick_button.classList.add("selected");
     cur_thickness = THICK_THICKNESS;
 });
+add_sticker_button.addEventListener("click", () => {
+    const text:string = prompt("Custom sticker text:","🧽");
+    if (text !== null) {
+        stickers.push({name: text});
+        const new_button : HTMLButtonElement = make_sticker_button(sticker_detail_div, text);
+        sticker_detail_div.removeChild(new_button);//-_-
+        add_sticker_button.insertAdjacentElement('beforebegin', new_button);
+        new_button.click();
+    }
+
+})
 undo_button.addEventListener("click", () => {undo()});
 redo_button.addEventListener("click", () => {redo()});
 clear_button.addEventListener("click", () => {clear_canvas(ctx)});
