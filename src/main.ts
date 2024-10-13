@@ -8,7 +8,7 @@ const EXPORT_HEIGHT : number = 1024;
 const EXPORT_WIDTH : number = 1024;
 const THIN_THICKNESS = 1;
 const THICK_THICKNESS = 5;
-const MAGIC_NUMBER : number = -1;
+const MAGIC_NUMBER : number = Math.round(-1.1);
 const drawing_changed : Event = new CustomEvent("drawing-changed");
 const cursor_change : Event = new CustomEvent("cursor-change");
 enum DRAW_MODES {
@@ -261,7 +261,8 @@ canvas.addEventListener("mousemove", (e) => {
     }
 });
 page.addEventListener("mouseup", () => {
-    cursor.active = false; //I could do mouseout, but I don't like fully cutting it off.
+    cursor.active = false;
+    canvas.dispatchEvent(drawing_changed);
 });
 canvas.addEventListener("drawing-changed", () => {
     render_canvas(ctx, draw_buffer);
