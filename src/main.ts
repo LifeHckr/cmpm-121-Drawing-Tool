@@ -6,8 +6,6 @@ const CANVAS_WIDTH : number = 256;
 const CANVAS_HEIGHT : number = 256;
 const EXPORT_HEIGHT : number = 1024;
 const EXPORT_WIDTH : number = 1024;
-const THIN_THICKNESS = 1;
-const THICK_THICKNESS = 5;
 const MAGIC_NUMBER : number = Math.round(-1.1);
 const drawing_changed : Event = new CustomEvent("drawing-changed");
 const cursor_change : Event = new CustomEvent("cursor-change");
@@ -29,15 +27,23 @@ const canvas : HTMLCanvasElement = make_html_element("canvas", page);
 const ctx : CanvasRenderingContext2D = canvas.getContext("2d");
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
-
 const button_div : HTMLDivElement = make_html_element("div", page);
     const action_div : HTMLDivElement = make_html_element("div", button_div);
         const marker_button : HTMLButtonElement = make_html_element("button", action_div, "Marker");
         const sticker_button : HTMLButtonElement = make_html_element("button", action_div, "Sticker");
     const action_detail_div : HTMLDivElement = make_html_element("div", action_div);
         const marker_detail_div : HTMLDivElement = make_html_element("div", action_detail_div);
-            const marker_thick_button : HTMLButtonElement = make_html_element("button", marker_detail_div, "Thick");
-            const marker_thin_button : HTMLButtonElement = make_html_element("button", marker_detail_div, "Thin");
+            const color_picker : HTMLInputElement = make_html_element("input", marker_detail_div);
+            color_picker.type = "color";
+            const size_picker : HTMLInputElement = make_html_element("input", marker_detail_div);
+            size_picker.type = "range";
+            size_picker.max = "100";
+            size_picker.min = "1";
+            size_picker.step = "1";
+            size_picker.value = "1";
+            const size_label : HTMLInputElement = make_html_element("input", marker_detail_div);
+            size_label.type = "number";
+            size_label.value = size_picker.value;
         const sticker_detail_div : HTMLDivElement = make_html_element("div", action_detail_div);
             draw_sticker_buttons(stickers);
             const add_sticker_button : HTMLButtonElement = make_html_element("button", sticker_detail_div, "Add Sticker...");
@@ -48,10 +54,7 @@ const button_div : HTMLDivElement = make_html_element("div", page);
         const export_button: HTMLButtonElement = make_html_element("button", command_button_div, "Export");
 //Initial state------
 marker_button.classList.add("selected");
-marker_thin_button.classList.add("selected");
-
 sticker_detail_div.hidden = true;
-add_sticker_button.classList.add("last");
 //-------------
 //END HTML-------------------------------------------
 
@@ -79,12 +82,14 @@ class Preview_Drawable implements Drawable_Command {
             case (DRAW_MODES.MARKER):
                 ctx.lineWidth = 1; //lineTo thickness changes lineWidth, but arc doesn't. Fixes a slight artifacting.
                 ctx.beginPath();
+                ctx.strokeStyle = cur_color;
+                ctx.fillStyle = cur_color;
                 ctx.arc(this.pos[0], this.pos[1], cur_thickness * .5, 0, 2 * Math.PI);
                 ctx.fill();
                 ctx.stroke();
                 break;
             case (DRAW_MODES.STICKER):
-                ctx.fillText(cur_sticker_text, this.pos[0], this.pos[1])
+                ctx.fillText(cur_sticker_text, this.pos[0] - ctx.measureText(cur_sticker_text).width/2, this.pos[1]+parseInt(ctx.font)/2);
                 break;
         }
     }
@@ -92,17 +97,22 @@ class Preview_Drawable implements Drawable_Command {
 class Marker_Line_Action implements Drawable_Command {
     points :[number, number][]= [];
     thickness: number;
+    color : string;
     empty:boolean = true;
-    constructor(x : number, y:number, thickness:number = THIN_THICKNESS) {
+    constructor(x : number, y:number, thickness:number, color : string) {
         this.points.push([x, y]);
         this.thickness = thickness;
+        this.color = color;
     }
     drag(x:number, y:number): void {
         this.points.push([x, y]);
         this.empty = false;
     }
     display(ctx:CanvasRenderingContext2D):void {
-         if (this.empty) {
+        console.log(ctx.fillStyle);
+        ctx.fillStyle = this.color;
+        ctx.strokeStyle = this.color;
+        if (this.empty) {
              ctx.lineWidth = 1; //lineTo thickness changes lineWidth, but arc doesn't. Fixes a slight artifacting.
              ctx.beginPath();
              ctx.arc(this.points[0][0], this.points[0][1], this.thickness * .5, 0, 2 * Math.PI);
@@ -119,17 +129,23 @@ class Marker_Line_Action implements Drawable_Command {
     }
 }
 class Sticker_Action implements Drawable_Command {
-    pos : [number, number];
+    pos : [number, number]; //center ~ x:length/2 y:fontSize/2
     text : string;
+    rotation : number = 0;
     constructor(x : number, y : number, text : string) {
         this.pos = [x, y];
         this.text  = text;
     }
     drag (x:number, y:number): void {
-        this.pos = [x, y];
+        const pos_dif_as_vector : [number, number] = [x - this.pos[0], y - this.pos[1]];
+        const angle = Math.atan2(pos_dif_as_vector[1], pos_dif_as_vector[0]);
+        this.rotation = (angle);
     }
     display(ctx:CanvasRenderingContext2D):void {
-        ctx.fillText(this.text, this.pos[0], this.pos[1]);
+        ctx.translate(this.pos[0], this.pos[1])
+        ctx.rotate(this.rotation);
+        ctx.fillText(this.text, ctx.measureText(this.text).width/-2, parseInt(ctx.font)/2);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
 }
 
@@ -140,13 +156,14 @@ let undo_buffer_size : number = 0;
 
 let cur_mode : DRAW_MODES = DRAW_MODES.MARKER;
 let cur_thickness : number = 1;
+let cur_color : string = color_picker.value;
 let cur_sticker_text : string|null = null;
-
 
 const cursor : Cursor = { active: false, x: 0, y: 0 };
 let cursor_preview : Preview_Drawable|null = null;
 
-
+//Function definitions---------------------------
+//Renders all the current drawing commands in buffer to ctx
 function render_canvas(ctx : CanvasRenderingContext2D, buffer : any[]) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let path_index = 0; path_index < buffer.length; path_index++) {
@@ -156,12 +173,14 @@ function render_canvas(ctx : CanvasRenderingContext2D, buffer : any[]) {
         cursor_preview.display(ctx);
     }
 }
+//Clears ctx and resets buffers
 function clear_canvas(ctx : CanvasRenderingContext2D) {
     draw_buffer = [];
     draw_buffer_size = MAGIC_NUMBER;
     undo_buffer_size = 0;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
+//Undoes the last action by popping it from current stack onto undo buffer.
 function undo():void {
     if (draw_buffer_size > MAGIC_NUMBER) {
         undo_buffer.push(draw_buffer.pop());
@@ -170,6 +189,7 @@ function undo():void {
     }
     render_canvas(ctx, draw_buffer);
 }
+//Redoes last undone action by popping from undo stack. Cannot redo if a new action has been done.
 function redo():void {
     if (undo_buffer_size > 0) {
         draw_buffer.push(undo_buffer.pop());
@@ -178,6 +198,7 @@ function redo():void {
     }
     render_canvas(ctx, draw_buffer);
 }
+//Draws to a new canvas, which gets saved as png
 function export_canvas(draw_buffer : Drawable_Command[]):void {
     const result_canvas : HTMLCanvasElement = document.createElement("canvas");
     result_canvas.width = EXPORT_WIDTH;
@@ -200,12 +221,14 @@ function export_canvas(draw_buffer : Drawable_Command[]):void {
     anchor.click();
 
 }
+//Makes a html element of type, appends it to parent, and optionally sets innerHtml to name
 function make_html_element(type : string, parent : Element, name : string = ""):any  {
     let element : HTMLElement = document.createElement(type);
     parent.appendChild(element);
     element.innerHTML = name;
     return element;
 }
+//Makes a button from custom sticker button
 function make_sticker_button(parent : Element, name : string = "") : HTMLButtonElement {
     let button : HTMLButtonElement = make_html_element("button", parent, name);
     button.addEventListener("click", () => {
@@ -219,11 +242,13 @@ function make_sticker_button(parent : Element, name : string = "") : HTMLButtonE
     });
     return button;
 }
+//Draws the initial set of sticker buttons defined in buttons
 function draw_sticker_buttons(button_list : Sticker_Config[]) {
     for (let i = 0; i < button_list.length; i++) {
         make_sticker_button(sticker_detail_div, button_list[i].name);
     }
 }
+//End-----------------------------------------------------
 
 canvas.addEventListener("mouseout", () => {
     cursor_preview = null;
@@ -242,7 +267,7 @@ canvas.addEventListener("mousedown", (e) => {
     draw_buffer_size++;
     switch (cur_mode){
         case DRAW_MODES.MARKER:
-            draw_buffer[draw_buffer_size] = new Marker_Line_Action(cursor.x, cursor.y, cur_thickness);
+            draw_buffer[draw_buffer_size] = new Marker_Line_Action(cursor.x, cursor.y, cur_thickness, cur_color);
             break;
         case DRAW_MODES.STICKER:
             draw_buffer[draw_buffer_size] = new Sticker_Action(cursor.x, cursor.y, cur_sticker_text);
@@ -255,6 +280,7 @@ canvas.addEventListener("mousemove", (e) => {
         canvas.dispatchEvent(drawing_changed);
         cursor.x = e.offsetX;
         cursor.y = e.offsetY;
+        cursor_preview = null;
     } else {
         cursor_preview = new Preview_Drawable(e.offsetX, e.offsetY);
         canvas.dispatchEvent(cursor_change);
@@ -289,16 +315,6 @@ sticker_button.addEventListener("click", () => {
     let first_button : HTMLButtonElement = sticker_detail_div.firstChild as HTMLButtonElement;
     first_button.click();
 });
-marker_thin_button.addEventListener("click", () => {
-    marker_thin_button.parentElement.querySelector(".selected").classList.remove("selected");
-    marker_thin_button.classList.add("selected");
-    cur_thickness = THIN_THICKNESS;
-});
-marker_thick_button.addEventListener("click", () => {
-    marker_thick_button.parentElement.querySelector(".selected").classList.remove("selected");
-    marker_thick_button.classList.add("selected");
-    cur_thickness = THICK_THICKNESS;
-});
 add_sticker_button.addEventListener("click", () => {
     const text:string = prompt("Custom sticker text:","🧽");
     if (text !== null) {
@@ -314,5 +330,17 @@ undo_button.addEventListener("click", () => {undo()});
 redo_button.addEventListener("click", () => {redo()});
 clear_button.addEventListener("click", () => {clear_canvas(ctx)});
 export_button.addEventListener(("click"), () => {export_canvas(draw_buffer)});
-
-
+color_picker.addEventListener("input", () => {
+    cur_color = color_picker.value;
+    canvas.dispatchEvent(cursor_change);
+});
+size_picker.addEventListener("input", () => {
+    cur_thickness = parseInt(size_picker.value);
+    size_label.value = size_picker.value;
+    canvas.dispatchEvent(cursor_change);
+})
+size_label.addEventListener("input", () => {
+    cur_thickness = parseInt(size_label.value);
+    size_picker.value = size_label.value;
+    canvas.dispatchEvent(cursor_change);
+})
