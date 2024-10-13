@@ -4,6 +4,7 @@ import "./style.css";
 const APP_NAME : string = "Draw Thing Please!";
 const CANVAS_WIDTH : number = 256;
 const CANVAS_HEIGHT : number = 256;
+const MAGIC_NUMBER : number = -1;
 const drawing_changed : Event = new CustomEvent("drawing-changed");
 //-------end const's---------------------------------
 //HTML SETUP------------------------------------
@@ -27,48 +28,61 @@ const redo_button = document.createElement("button");
 redo_button.innerHTML = "redo";
 command_button_div.append(redo_button);
 const clear_button = document.createElement("button");
-clear_button.innerHTML = "clear";
+clear_button.innerHTML = "reset";
 command_button_div.append(clear_button);
 const ctx = canvas.getContext("2d");
 //END HTML-------------------------------------------
 
 //Set up drawing---------------------------------
-type stroke = [start_x:number, start_y:number, end_x:number, end_y:number];
-type path = stroke[];
-
-let draw_buffer : path[] = [];
-let draw_buffer_size : number = 0;
-let undo_buffer : path[] = [];
-let undo_buffer_size : number = 0;
-
-const cursor = { active: false, x: 0, y: 0 };
-
-function draw_all_to_canvas(ctx : CanvasRenderingContext2D, buffer : path[]) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let path_index = 0; path_index < buffer.length; path_index++) {
-        if (!buffer[path_index]) {
-            continue;
-        }
-        for (let stroke_index : number = 0; stroke_index < buffer[path_index].length; stroke_index++) {
+type Drawable_Command = {
+    display : (ctx : CanvasRenderingContext2D) => void;
+    drag : (x:number, y:number) => void;
+};
+class Marker_Line_Action implements Drawable_Command {
+    points :[number, number][]= [];
+    empty = true;
+    constructor(x : number, y:number) {
+        this.points.push([x, y]);
+    }
+    drag(x:number, y:number): void {
+        this.points.push([x, y]);
+        this.empty = false;
+    }
+    display(ctx:CanvasRenderingContext2D):void {
+        for (let stroke_index : number = 1; stroke_index < this.points.length; stroke_index++) {
             ctx.beginPath();//begin path
-            ctx.moveTo(buffer[path_index][stroke_index][0], buffer[path_index][stroke_index][1]); //start point
-            ctx.lineTo(buffer[path_index][stroke_index][2], buffer[path_index][stroke_index][3]);//line to for each move
+            ctx.moveTo(this.points[stroke_index-1][0], this.points[stroke_index-1][1]); //start point
+            ctx.lineTo(this.points[stroke_index][0], this.points[stroke_index][1]);//line to for each move
             ctx.stroke(); //stroke, draws the current path
         }
     }
 }
+
+let draw_buffer : Drawable_Command[] = [];
+let draw_buffer_size : number = MAGIC_NUMBER;
+let undo_buffer : Drawable_Command[] = [];
+let undo_buffer_size : number = 0;
+
+const cursor = { active: false, x: 0, y: 0 };
+
+function render_canvas(ctx : CanvasRenderingContext2D, buffer : any[]) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let path_index = 0; path_index < buffer.length; path_index++) {
+        draw_buffer[path_index].display(ctx);
+    }
+}
 function clear_canvas(ctx : CanvasRenderingContext2D) {
     draw_buffer = [];
-    draw_buffer_size = 0;
+    draw_buffer_size = MAGIC_NUMBER;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 function undo() {
-    if (draw_buffer_size > 0) {
+    if (draw_buffer_size > MAGIC_NUMBER) {
         undo_buffer.push(draw_buffer.pop());
         draw_buffer_size--;
         undo_buffer_size++;
     }
-    draw_all_to_canvas(ctx, draw_buffer);
+    render_canvas(ctx, draw_buffer);
 }
 function redo() {
     if (undo_buffer_size > 0) {
@@ -76,34 +90,29 @@ function redo() {
         draw_buffer_size++;
         undo_buffer_size--;
     }
-    draw_all_to_canvas(ctx, draw_buffer);
+    render_canvas(ctx, draw_buffer);
 }
 canvas.addEventListener("mousedown", (e) => {
-    if (cursor.active) { //temporary fix for issues arising when the cursor leaves the canvas
-        draw_buffer_size++;
-        undo_buffer_size = 0; //reset undo buffer if an action has been taken, cant undo the draw then redo
-    }
     cursor.active = true;
-    draw_buffer[draw_buffer_size] = [];
+    undo_buffer_size = 0; //reset undo buffer
     cursor.x = e.offsetX;
     cursor.y = e.offsetY;
+    draw_buffer_size++;
+    draw_buffer[draw_buffer_size] = new Marker_Line_Action(cursor.x, cursor.y);
 });
 canvas.addEventListener("mousemove", (e) => {
     if (cursor.active) {
-        let cur_stroke : stroke = [cursor.x, cursor.y, e.offsetX, e.offsetY];
-        draw_buffer[draw_buffer_size].push(cur_stroke);
+        draw_buffer[draw_buffer_size].drag(cursor.x, cursor.y);
         canvas.dispatchEvent(drawing_changed);
         cursor.x = e.offsetX;
         cursor.y = e.offsetY;
     }
 });
-canvas.addEventListener("mouseup", () => {
-    cursor.active = false;
-    draw_buffer_size++;
-    undo_buffer_size = 0;
+page.addEventListener("mouseup", () => {
+    cursor.active = false; //I could do mouseout, but I don't like fully cutting it off.
 });
 canvas.addEventListener("drawing-changed", () => {
-    draw_all_to_canvas(ctx, draw_buffer);
+    render_canvas(ctx, draw_buffer);
 });
 undo_button.addEventListener("click", () => {
     undo();
