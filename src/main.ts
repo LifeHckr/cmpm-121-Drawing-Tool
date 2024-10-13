@@ -145,7 +145,8 @@ class Sticker_Action implements Drawable_Command {
         ctx.translate(this.pos[0], this.pos[1])
         ctx.rotate(this.rotation);
         ctx.fillText(this.text, ctx.measureText(this.text).width/-2, parseInt(ctx.font)/2);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.rotate(-this.rotation);
+        ctx.translate(-this.pos[0], -this.pos[1])
     }
 }
 
