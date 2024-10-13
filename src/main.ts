@@ -1,6 +1,6 @@
 import "./style.css";
 
-//const's-----------------------------------
+//const's-----------------------------------This
 const APP_NAME : string = "Draw Thing Please!";
 const CANVAS_WIDTH : number = 256;
 const CANVAS_HEIGHT : number = 256;
