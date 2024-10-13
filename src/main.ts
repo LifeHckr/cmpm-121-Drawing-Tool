@@ -4,6 +4,8 @@ import "./style.css";
 const APP_NAME : string = "Draw Thing Please!";
 const CANVAS_WIDTH : number = 256;
 const CANVAS_HEIGHT : number = 256;
+const EXPORT_HEIGHT : number = 1024;
+const EXPORT_WIDTH : number = 1024;
 const THIN_THICKNESS = 1;
 const THICK_THICKNESS = 5;
 const MAGIC_NUMBER : number = -1;
@@ -43,6 +45,7 @@ const button_div : HTMLDivElement = make_html_element("div", page);
         const undo_button: HTMLButtonElement = make_html_element("button", command_button_div, "Undo");
         const redo_button: HTMLButtonElement = make_html_element("button", command_button_div, "Redo");
         const clear_button: HTMLButtonElement = make_html_element("button", command_button_div, "Reset");
+        const export_button: HTMLButtonElement = make_html_element("button", command_button_div, "Export");
 //Initial state------
 marker_button.classList.add("selected");
 marker_thin_button.classList.add("selected");
@@ -108,10 +111,10 @@ class Marker_Line_Action implements Drawable_Command {
         }
         ctx.lineWidth = this.thickness;
         for (let stroke_index : number = 1; stroke_index < this.points.length; stroke_index++) {
-            ctx.beginPath();//begin path
-            ctx.moveTo(this.points[stroke_index-1][0], this.points[stroke_index-1][1]); //start point
-            ctx.lineTo(this.points[stroke_index][0], this.points[stroke_index][1]);//line to for each move
-            ctx.stroke(); //stroke, draws the current path
+            ctx.beginPath();
+            ctx.moveTo(this.points[stroke_index-1][0], this.points[stroke_index-1][1]);
+            ctx.lineTo(this.points[stroke_index][0], this.points[stroke_index][1]);
+            ctx.stroke();//In case anyone cares, yes I know the lines are slightly more jagged, I know how to fix it, but I've kept it like this for consistency, and artistic vision.
         }
     }
 }
@@ -174,6 +177,28 @@ function redo():void {
         undo_buffer_size--;
     }
     render_canvas(ctx, draw_buffer);
+}
+function export_canvas(draw_buffer : Drawable_Command[]):void {
+    const result_canvas : HTMLCanvasElement = document.createElement("canvas");
+    result_canvas.width = EXPORT_WIDTH;
+    result_canvas.height = EXPORT_HEIGHT;
+    const result_ctx:CanvasRenderingContext2D = result_canvas.getContext("2d");
+    const prompt_res:string = prompt("Transparent background?: (y/n)","n");
+    if (prompt_res === "n") {
+        result_ctx.fillStyle = "white";
+        result_ctx.fillRect(0, 0, result_canvas.width, result_canvas.height);
+        result_ctx.fill();
+        result_ctx.fillStyle = "black";
+    }
+    result_ctx.scale(EXPORT_WIDTH/CANVAS_WIDTH, EXPORT_HEIGHT/CANVAS_HEIGHT);
+    for (let path_index = 0; path_index < draw_buffer.length; path_index++) {
+        draw_buffer[path_index].display(result_ctx);
+    }
+    const anchor:HTMLAnchorElement = document.createElement("a");
+    anchor.href = result_canvas.toDataURL("image/png");
+    anchor.download = "sketchpad.png";
+    anchor.click();
+
 }
 function make_html_element(type : string, parent : Element, name : string = ""):any  {
     let element : HTMLElement = document.createElement(type);
@@ -287,5 +312,6 @@ add_sticker_button.addEventListener("click", () => {
 undo_button.addEventListener("click", () => {undo()});
 redo_button.addEventListener("click", () => {redo()});
 clear_button.addEventListener("click", () => {clear_canvas(ctx)});
+export_button.addEventListener(("click"), () => {export_canvas(draw_buffer)});
 
 
