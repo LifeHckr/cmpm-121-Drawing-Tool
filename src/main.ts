@@ -234,9 +234,8 @@ function make_sticker_button(parent : Element, name : string = "") : HTMLButtonE
     let button : HTMLButtonElement = make_html_element("button", parent, name);
     button.addEventListener("click", () => {
         cur_sticker_text = name;
-        try {
-            button.parentElement.querySelector(".selected").classList.remove("selected");
-        } catch { //Look at what you make me do for my funny QoL )_)
+        if (button.parentElement.querySelector(".selected") !== null) {
+            button.parentElement.querySelector(".selected").classList.remove("selected")
         }
         button.classList.add("selected");
         canvas.dispatchEvent(cursor_change);
