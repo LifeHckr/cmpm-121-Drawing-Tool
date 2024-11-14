@@ -6,7 +6,7 @@ const CANVAS_WIDTH : number = 256;
 const CANVAS_HEIGHT : number = 256;
 const EXPORT_HEIGHT : number = 1024;
 const EXPORT_WIDTH : number = 1024;
-const MAGIC_NUMBER : number = Math.round(-1.1);
+const EMPTY_BUFFER_SIZE : number = -1;
 const drawing_changed : Event = new CustomEvent("drawing-changed");
 const cursor_change : Event = new CustomEvent("cursor-change");
 enum DRAW_MODES {
@@ -27,6 +27,7 @@ const canvas : HTMLCanvasElement = make_html_element("canvas", page);
 const ctx : CanvasRenderingContext2D = canvas.getContext("2d");
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
+
 const button_div : HTMLDivElement = make_html_element("div", page);
     const action_div : HTMLDivElement = make_html_element("div", button_div);
         const marker_button : HTMLButtonElement = make_html_element("button", action_div, "Marker");
@@ -151,7 +152,7 @@ class Sticker_Action implements Drawable_Command {
 }
 
 let draw_buffer : Drawable_Command[] = [];
-let draw_buffer_size : number = MAGIC_NUMBER;
+let draw_buffer_size : number = EMPTY_BUFFER_SIZE;
 let undo_buffer : Drawable_Command[] = [];
 let undo_buffer_size : number = 0;
 
@@ -177,13 +178,13 @@ function render_canvas(ctx : CanvasRenderingContext2D, buffer : any[]) {
 //Clears ctx and resets buffers
 function clear_canvas(ctx : CanvasRenderingContext2D) {
     draw_buffer = [];
-    draw_buffer_size = MAGIC_NUMBER;
+    draw_buffer_size = EMPTY_BUFFER_SIZE;
     undo_buffer_size = 0;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 //Undoes the last action by popping it from current stack onto undo buffer.
 function undo():void {
-    if (draw_buffer_size > MAGIC_NUMBER) {
+    if (draw_buffer_size > EMPTY_BUFFER_SIZE) {
         undo_buffer.push(draw_buffer.pop());
         draw_buffer_size--;
         undo_buffer_size++;
@@ -232,6 +233,7 @@ function make_html_element(type : string, parent : Element, name : string = ""):
 //Makes a button from custom sticker button
 function make_sticker_button(parent : Element, name : string = "") : HTMLButtonElement {
     let button : HTMLButtonElement = make_html_element("button", parent, name);
+    button.title = "Click and drag mouse to rotate sticker"; // Tooltip message
     button.addEventListener("click", () => {
         cur_sticker_text = name;
         if (button.parentElement.querySelector(".selected") !== null) {
