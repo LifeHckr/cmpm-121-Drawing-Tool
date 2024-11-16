@@ -24,7 +24,7 @@ const page: HTMLDivElement  = document.querySelector<HTMLDivElement>("#app")!;
 document.title = APP_NAME;
 make_html_element("h1", page, APP_NAME)
 const canvas : HTMLCanvasElement = make_html_element("canvas", page);
-const ctx : CanvasRenderingContext2D = canvas.getContext("2d");
+const ctx : CanvasRenderingContext2D = canvas.getContext("2d")!;
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
 
@@ -90,7 +90,7 @@ class Preview_Drawable implements Drawable_Command {
                 ctx.stroke();
                 break;
             case (DRAW_MODES.STICKER):
-                ctx.fillText(cur_sticker_text, this.pos[0] - ctx.measureText(cur_sticker_text).width/2, this.pos[1]+parseInt(ctx.font)/2);
+                ctx.fillText(cur_sticker_text!, this.pos[0] - ctx.measureText(cur_sticker_text!).width/2, this.pos[1]+parseInt(ctx.font)/2);
                 break;
         }
     }
@@ -110,7 +110,6 @@ class Marker_Line_Action implements Drawable_Command {
         this.empty = false;
     }
     display(ctx:CanvasRenderingContext2D):void {
-        console.log(ctx.fillStyle);
         ctx.fillStyle = this.color;
         ctx.strokeStyle = this.color;
         if (this.empty) {
@@ -185,7 +184,7 @@ function clear_canvas(ctx : CanvasRenderingContext2D) {
 //Undoes the last action by popping it from current stack onto undo buffer.
 function undo():void {
     if (draw_buffer_size > EMPTY_BUFFER_SIZE) {
-        undo_buffer.push(draw_buffer.pop());
+        undo_buffer.push(draw_buffer.pop()!);
         draw_buffer_size--;
         undo_buffer_size++;
     }
@@ -193,8 +192,8 @@ function undo():void {
 }
 //Redoes last undone action by popping from undo stack. Cannot redo if a new action has been done.
 function redo():void {
-    if (undo_buffer_size > 0) {
-        draw_buffer.push(undo_buffer.pop());
+    if (undo_buffer_size > EMPTY_BUFFER_SIZE) {
+        draw_buffer.push(undo_buffer.pop()!);
         draw_buffer_size++;
         undo_buffer_size--;
     }
@@ -205,8 +204,8 @@ function export_canvas(draw_buffer : Drawable_Command[]):void {
     const result_canvas : HTMLCanvasElement = document.createElement("canvas");
     result_canvas.width = EXPORT_WIDTH;
     result_canvas.height = EXPORT_HEIGHT;
-    const result_ctx:CanvasRenderingContext2D = result_canvas.getContext("2d");
-    const prompt_res:string = prompt("Transparent background?: (y/n)","n");
+    const result_ctx:CanvasRenderingContext2D = result_canvas.getContext("2d")!;
+    const prompt_res:string = prompt("Transparent background?: (y/n)","n")!;
     if (prompt_res === "n") {
         result_ctx.fillStyle = "white";
         result_ctx.fillRect(0, 0, result_canvas.width, result_canvas.height);
@@ -225,19 +224,19 @@ function export_canvas(draw_buffer : Drawable_Command[]):void {
 }
 //Makes a html element of type, appends it to parent, and optionally sets innerHtml to name
 function make_html_element(type : string, parent : Element, name : string = ""):any  {
-    let element : HTMLElement = document.createElement(type);
+    const element : HTMLElement = document.createElement(type);
     parent.appendChild(element);
     element.innerHTML = name;
     return element;
 }
 //Makes a button from custom sticker button
 function make_sticker_button(parent : Element, name : string = "") : HTMLButtonElement {
-    let button : HTMLButtonElement = make_html_element("button", parent, name);
+    const button : HTMLButtonElement = make_html_element("button", parent, name);
     button.title = "Click and drag mouse to rotate sticker"; // Tooltip message
     button.addEventListener("click", () => {
         cur_sticker_text = name;
-        if (button.parentElement.querySelector(".selected") !== null) {
-            button.parentElement.querySelector(".selected").classList.remove("selected")
+        if (button.parentElement?.querySelector(".selected") !== null) {
+            button.parentElement!.querySelector(".selected")?.classList.remove("selected");
         }
         button.classList.add("selected");
         canvas.dispatchEvent(cursor_change);
@@ -272,7 +271,7 @@ canvas.addEventListener("mousedown", (e) => {
             draw_buffer[draw_buffer_size] = new Marker_Line_Action(cursor.x, cursor.y, cur_thickness, cur_color);
             break;
         case DRAW_MODES.STICKER:
-            draw_buffer[draw_buffer_size] = new Sticker_Action(cursor.x, cursor.y, cur_sticker_text);
+            draw_buffer[draw_buffer_size] = new Sticker_Action(cursor.x, cursor.y, cur_sticker_text!);
             break;
     }
 });
@@ -300,7 +299,9 @@ canvas.addEventListener("cursor-change",  () => {
 });
 
 marker_button.addEventListener("click", () => {
-    marker_button.parentElement.querySelector(".selected").classList.remove("selected");
+    if (marker_button.parentElement?.querySelector(".selected") !== null) {
+        marker_button.parentElement!.querySelector(".selected")?.classList.remove("selected");
+    }
     marker_button.classList.add("selected");
     canvas.dispatchEvent(cursor_change);
     cur_mode = DRAW_MODES.MARKER;
@@ -308,17 +309,19 @@ marker_button.addEventListener("click", () => {
     marker_detail_div.hidden = false;
 });
 sticker_button.addEventListener("click", () => {
-    sticker_button.parentElement.querySelector(".selected").classList.remove("selected");
+    if (sticker_button.parentElement?.querySelector(".selected") !== null) {
+        sticker_button.parentElement!.querySelector(".selected")?.classList.remove("selected");
+    }
     sticker_button.classList.add("selected");
     canvas.dispatchEvent(cursor_change);
     cur_mode = DRAW_MODES.STICKER;
     marker_detail_div.hidden = true;
     sticker_detail_div.hidden = false;
-    let first_button : HTMLButtonElement = sticker_detail_div.firstChild as HTMLButtonElement;
+    const first_button : HTMLButtonElement = sticker_detail_div.firstChild as HTMLButtonElement;
     first_button.click();
 });
 add_sticker_button.addEventListener("click", () => {
-    const text:string = prompt("Custom sticker text:","🧽");
+    const text = prompt("Custom sticker text:","🧽");
     if (text !== null) {
         stickers.push({name: text});
         const new_button : HTMLButtonElement = make_sticker_button(sticker_detail_div, text);
